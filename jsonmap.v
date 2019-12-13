@@ -37,7 +37,7 @@ pub enum TokenKind {
   no_prev open str colon comma close
 }
 
-pub fn new_default_parser() Parser {
+pub fn default_parser() Parser {
   return new_parser(ParserOptions{
     ignore_symbols     : DEFAULT_IGNORE_SYMBOLS
     recursive          : DEFAULT_RECURSIVE

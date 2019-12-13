@@ -4,7 +4,7 @@
     "key3": "value3",
     "object": {
         "recursive": "yes",
-        "boolean support": "soon"
+        "bool support": "soon"
     },
     "key4": "value4"
 }
