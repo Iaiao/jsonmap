@@ -9,7 +9,11 @@
         "object": {
             "a": "b",
             "c": "d",
-            "null": null
+            "null": null,
+            "keys require quotes": "yes, but you can change this",
+            "more objects": {
+                "why": "unknown"
+            }
         }
     },
     "key4": "value4"

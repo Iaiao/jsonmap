@@ -71,18 +71,27 @@ fn (p mut Parser) next() ?Token {
     p.i++
     return p.next()
   }
-  mut tk := TokenKind(0)
+  p.prev = p.now
+  p.now = TokenKind(0)
   mut s := ""
 
-  // strings.Builder can build only once and byte array is private
-  int_start := p.i
+  start := p.i
+  if p.prev == .comma && p.s[p.i] != `"` && !p.options.key_require_quotes {
+    for p.s[p.i] != `:` {
+      p.i++
+    }
+    p.i--
+    s = p.s[start .. p.i]
+    p.now = .str
+  }
+
   if p.s[p.i] == `-` {
     s = "-"
     p.i++
   }
   if p.s[p.i] in NUMBERS {
     for {
-      before := p.s[int_start .. p.i]
+      before := p.s[start .. p.i]
       if before.len == 0 && p.s[p.i] == `0` {
         // do not allow numbers with leading zeros
         p.i++
@@ -122,8 +131,8 @@ fn (p mut Parser) next() ?Token {
       p.i++
     }
     p.i--
-    tk = .str
-    s += p.s[int_start .. p.i]
+    p.now = .str
+    s += p.s[start .. p.i]
   }
   if s == "-" {
     return error("Unexpected `-` at position $p.i")
@@ -131,16 +140,16 @@ fn (p mut Parser) next() ?Token {
   if s == "" {
     match p.s[p.i] {
       `{` {
-        tk = .open
+        p.now = .open
       }
       `}` {
-        tk = .close
+        p.now = .close
       }
       `:` {
-        tk = .colon
+        p.now = .colon
       }
       `"` {
-        tk = .str
+        p.now = .str
         mut sb := strings.new_builder(0)
         p.i++
         for p.s[p.i] != `"` {
@@ -150,11 +159,11 @@ fn (p mut Parser) next() ?Token {
         s = sb.str()
       }
       `,` {
-        tk = .comma
+        p.now = .comma
       }
       `t` {
         if p.s[p.i .. p.i + 4] == "true" {
-          tk = .str
+          p.now = .str
           s = "true"
           p.i += 3
         } else {
@@ -163,7 +172,7 @@ fn (p mut Parser) next() ?Token {
       }
       `f` {
         if p.s[p.i .. p.i + 5] == "false" {
-          tk = .str
+          p.now = .str
           s = "false"
           p.i += 4
         } else {
@@ -172,7 +181,7 @@ fn (p mut Parser) next() ?Token {
       }
       `n` {
         if p.s[p.i .. p.i + 4] == "null" {
-          tk = .str
+          p.now = .str
           s = "null"
           p.i += 3
         } else {
@@ -188,9 +197,7 @@ fn (p mut Parser) next() ?Token {
     s = p.s[p.i].str()
   }
   p.i++
-  p.prev = p.now
-  p.now = tk
-  return Token { tk, s }
+  return Token { p.now, s }
 }
 
 pub fn (p mut Parser) parse(s string) map[string]string {
@@ -246,6 +253,7 @@ pub fn (p mut Parser) parse(s string) map[string]string {
         return m
       }
       .str {
+        println(p.prev.str())
         if p.prev == .comma || p.prev == .open {
           p.current_key = token.str
           if m[p.current_key] != "" && !p.options.allow_duplicate_keys {
