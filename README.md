@@ -11,7 +11,7 @@ import iaiao.jsonmap
 import os
 
 fn main() {
-	file := os.read_file("jsonmap/test.json")?
+	file := os.read_file("test.json")?
 	mut parser := jsonmap.default_parser()
 	m := parser.parse(file)
 	println(m)
