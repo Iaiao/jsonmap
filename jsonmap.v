@@ -8,6 +8,7 @@ pub const (
   DEFAULT_RECURSION_SYMBOL = "."
   DEFAULT_IGNORE_COMMAS = false
   DEFAULT_KEY_REQUIRE_QUOTES = true
+  DEFAULT_ALLOW_DUPLICATE_KEYS = false
 )
 
 const (
@@ -20,6 +21,7 @@ pub struct ParserOptions {
   recursion_symbol string
   ignore_commas bool
   key_require_quotes bool
+  allow_duplicate_keys bool
 }
 
 struct Parser {
@@ -27,6 +29,7 @@ pub:
   options ParserOptions
 mut:
   s string
+  current_key string
   prev TokenKind
   now TokenKind
   i int
@@ -43,11 +46,12 @@ pub enum TokenKind {
 
 pub fn default_parser() Parser {
   return new_parser(ParserOptions{
-    ignore_symbols     : DEFAULT_IGNORE_SYMBOLS
-    recursive          : DEFAULT_RECURSIVE
-    recursion_symbol   : DEFAULT_RECURSION_SYMBOL
-    ignore_commas      : DEFAULT_IGNORE_COMMAS
-    key_require_quotes : DEFAULT_KEY_REQUIRE_QUOTES
+    ignore_symbols       : DEFAULT_IGNORE_SYMBOLS
+    recursive            : DEFAULT_RECURSIVE
+    recursion_symbol     : DEFAULT_RECURSION_SYMBOL
+    ignore_commas        : DEFAULT_IGNORE_COMMAS
+    key_require_quotes   : DEFAULT_KEY_REQUIRE_QUOTES
+    allow_duplicate_keys : DEFAULT_ALLOW_DUPLICATE_KEYS
   })
 }
 
@@ -162,6 +166,15 @@ fn (p mut Parser) next() ?Token {
           return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
         }
       }
+      `n` {
+        if p.s[p.i .. p.i + 4] == "null" {
+          tk = .str
+          s = "null"
+          p.i += 3
+        } else {
+          return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
+        }
+      }
       else {
         return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
       }
@@ -179,7 +192,7 @@ fn (p mut Parser) next() ?Token {
 pub fn (p mut Parser) parse(s string) map[string]string {
   p.s = s
   mut m := map[string]string
-  mut key := ""
+  p.current_key = ""
   for p.i < s.len {
     token := p.next() or {
       m["__error__"] = err
@@ -197,10 +210,10 @@ pub fn (p mut Parser) parse(s string) map[string]string {
             m["__error__"] = map2["__error__"] + " (in Object that starts at $start)"
             return m
           }
-          for key2, value in map2 {
-            m[key + p.options.recursion_symbol + key2] = value
+          for key, value in map2 {
+            m[p.current_key + p.options.recursion_symbol + key] = value
           }
-          key = ""
+          p.current_key = ""
           p.i = end + 2
         } else if p.prev != .no_prev {
           m["__error__"] = "Unexpected Object at position $p.i"
@@ -208,13 +221,13 @@ pub fn (p mut Parser) parse(s string) map[string]string {
         }
       }
       .colon {
-        if p.prev != .str || key == "" {
+        if p.prev != .str || p.current_key == "" {
           m["__error__"] = "Unexpected colon at position $p.i"
           return m
         }
       }
       .comma {
-        if p.prev != .str || key != "" {
+        if p.prev != .str || p.current_key != "" {
           m["__error__"] = "Unexpected comma at position $p.i"
           return m
         }
@@ -223,17 +236,21 @@ pub fn (p mut Parser) parse(s string) map[string]string {
         if p.prev == .open {
           return m
         }
-        if p.prev != .str || key != ""  {
+        if p.prev != .str || p.current_key != ""  {
           m["__error__"] = "Unexpected end of object at position $p.i"
         }
         return m
       }
       .str {
         if p.prev == .comma || p.prev == .open {
-          key = token.str
-        } else if p.prev == .colon && key != "" {
-          m[key] = token.str
-          key = ""
+          p.current_key = token.str
+          if m[p.current_key] != "" && !p.options.allow_duplicate_keys {
+            m["__error__"] = "Duplicate key $p.current_key at $p.i"
+            return m
+          }
+        } else if p.prev == .colon && p.current_key != "" {
+          m[p.current_key] = token.str
+          p.current_key = ""
         } else {
           m["__error__"] = "Unexpected string at position $p.i"
           return m

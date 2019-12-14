@@ -8,7 +8,9 @@
         "int-support": 1.23E-14,
         "object": {
             "a": "b",
-            "c": "d"
+            "c": "d",
+            "null": null,
+            "a": "s"
         }
     },
     "key4": "value4"
