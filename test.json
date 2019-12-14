@@ -9,8 +9,7 @@
         "object": {
             "a": "b",
             "c": "d",
-            "null": null,
-            "a": "s"
+            "null": null
         }
     },
     "key4": "value4"

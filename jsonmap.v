@@ -72,6 +72,8 @@ fn (p mut Parser) next() ?Token {
   }
   mut tk := TokenKind(0)
   mut s := ""
+
+  // strings.Builder can build only once and byte array is private
   mut builder := []byte
   if p.s[p.i] == `-` {
     s = "-"
@@ -80,18 +82,20 @@ fn (p mut Parser) next() ?Token {
   if p.s[p.i] in NUMBERS {
     for {
       if builder.len == 0 && p.s[p.i] == `0` {
+        // do not allow numbers with leading zeros
         builder << `0`
         p.i++
         break
       }
-      str := string(builder, builder.len)
       if builder.len > 0 && (p.s[p.i] == `e` || p.s[p.i] == `E`) {
-        if str.contains("e") || str.contains("E") {
+        if builder.contains(`e`) || builder.contains(`E`) {
+          // do not allow multiple `E`s
           break
         }
         e_start := p.i
         p.i++
         if p.s[p.i] == `+` || p.s[p.i] == `-` {
+          // allow E+n, E-n, En ==
           p.i++
         }
         if p.s[p.i] in NUMBERS {
@@ -102,10 +106,13 @@ fn (p mut Parser) next() ?Token {
         return error("Unexpected `${p.s[p.i-1].str()}` at position ${p.i-1}")
       }
       if p.i > 0 && p.s[p.i] == `.` {
-        if str.contains("e") || str.contains("E") || str.contains(".") {
+        // do not allow leading `.`
+        if builder.contains(`e`) || builder.contains(`E`) || builder.contains(`.`) {
+          // do not allow `.` after `E` and multiple `.`s
           break
         }
         if p.s[p.i + 1] in NUMBERS {
+          // do not allow trailing `.`
           builder << `.`
           p.i++
           continue
