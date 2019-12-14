@@ -10,6 +10,10 @@ pub const (
   DEFAULT_KEY_REQUIRE_QUOTES = true
 )
 
+const (
+  NUMBERS = [ `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `0` ]
+)
+
 pub struct ParserOptions {
   ignore_symbols []byte
   recursive bool
@@ -63,37 +67,92 @@ fn (p mut Parser) next() ?Token {
     return p.next()
   }
   mut tk := TokenKind(0)
-  match p.s[p.i] {
-    `{` {
-      tk = .open
-    }
-    `}` {
-      tk = .close
-    }
-    `:` {
-      tk = .colon
-    }
-    `"` {
-      tk = .str
-    }
-    `,` {
-      tk = .comma
-    }
-    else {
-      return error("Unexpected symbol: `${p.s[p.i]}` at position $p.i")
-    }
+  mut s := ""
+  mut builder := []byte
+  if p.s[p.i] == `-` {
+    s = "-"
+    p.i++
   }
-  mut s := p.s[p.i].str()
-  p.i++
-  if tk == .str {
-    mut sb := strings.Builder{}
-    for p.s[p.i] != `"` {
-      sb.write(p.s[p.i].str())
+  if p.s[p.i] in NUMBERS {
+    for {
+      if builder.len == 0 && p.s[p.i] == `0` {
+        builder << `0`
+        p.i++
+        break
+      }
+      str := string(builder, builder.len)
+      if builder.len > 0 && (p.s[p.i] == `e` || p.s[p.i] == `E`) {
+        if str.contains("e") || str.contains("E") {
+          break
+        }
+        e_start := p.i
+        p.i++
+        if p.s[p.i] == `+` || p.s[p.i] == `-` {
+          p.i++
+        }
+        if p.s[p.i] in NUMBERS {
+          p.i++
+          builder.push_many(p.s[e_start .. p.i].str, p.i - e_start)
+          continue
+        }
+        return error("Unexpected `${p.s[p.i-1].str()}` at position ${p.i-1}")
+      }
+      if p.i > 0 && p.s[p.i] == `.` {
+        if str.contains("e") || str.contains("E") || str.contains(".") {
+          break
+        }
+        if p.s[p.i + 1] in NUMBERS {
+          builder << `.`
+          p.i++
+          continue
+        }
+      }
+      if !(p.s[p.i] in NUMBERS) {
+        break
+      }
+      builder << p.s[p.i]
       p.i++
     }
-    p.i++
-    s = sb.str()
+    p.i--
+    tk = .str
+    s += string(builder, builder.len)
   }
+  if s == "-" {
+    return error("Unexpected `-` at position $p.i")
+  }
+  if s == "" {
+    match p.s[p.i] {
+      `{` {
+        tk = .open
+      }
+      `}` {
+        tk = .close
+      }
+      `:` {
+        tk = .colon
+      }
+      `"` {
+        tk = .str
+        mut sb := strings.new_builder(0)
+        p.i++
+        for p.s[p.i] != `"` {
+          sb.write_b(p.s[p.i])
+          p.i++
+        }
+        s = sb.str()
+      }
+      `,` {
+        tk = .comma
+      }
+      else {
+        return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
+      }
+    }
+  }
+  if s == "" {
+    s = p.s[p.i].str()
+  }
+  p.i++
   p.prev = p.now
   p.now = tk
   return Token { tk, s }
@@ -137,7 +196,6 @@ pub fn (p mut Parser) parse(s string) map[string]string {
         }
       }
       .comma {
-        println(p.prev.str())
         if p.prev != .str || key != "" {
           m["__error__"] = "Unexpected comma at position $p.i"
           return m
@@ -163,6 +221,7 @@ pub fn (p mut Parser) parse(s string) map[string]string {
           return m
         }
       }
+      .no_prev {}
       else {
         m["__error__"] = "Unexpected error. This should never happen."
         return m
