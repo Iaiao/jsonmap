@@ -3,8 +3,8 @@
     "key2": "value2",
     "key3": "value3",
     "object": {
-        "recursive": "yes",
-        "bool-support": "soon",
+        "recursive": "true by default",
+        "bool-support": true,
         "int-support": 1.23E-14,
         "object": {
             "a": "b",

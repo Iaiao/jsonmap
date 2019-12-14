@@ -144,6 +144,24 @@ fn (p mut Parser) next() ?Token {
       `,` {
         tk = .comma
       }
+      `t` {
+        if p.s[p.i .. p.i + 4] == "true" {
+          tk = .str
+          s = "true"
+          p.i += 3
+        } else {
+          return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
+        }
+      }
+      `f` {
+        if p.s[p.i .. p.i + 5] == "false" {
+          tk = .str
+          s = "false"
+          p.i += 4
+        } else {
+          return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
+        }
+      }
       else {
         return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
       }
