@@ -17,12 +17,13 @@ const (
 
 pub struct ParserOptions {
 pub:
-  ignore_symbols []byte
   recursive bool
   recursion_symbol string
   ignore_commas bool
   key_require_quotes bool
   allow_duplicate_keys bool
+mut:
+  ignore_symbols []byte
 }
 
 struct Parser {
@@ -57,9 +58,13 @@ pub fn default_parser() Parser {
 }
 
 pub fn new_parser(options ParserOptions) Parser {
+  mut _options := options
+  if _options.ignore_commas {
+    _options.ignore_symbols << `,`
+  }
   return Parser {
     s       : "{}"
-    options : options
+    options : _options
     prev    : .no_prev
     now     : .no_prev
     i       : 0
@@ -76,20 +81,12 @@ fn (p mut Parser) next() ?Token {
   mut s := ""
 
   start := p.i
-  if p.prev == .comma && p.s[p.i] != `"` && !p.options.key_require_quotes {
-    for p.s[p.i] != `:` {
-      p.i++
-    }
-    p.i--
-    s = p.s[start .. p.i]
-    p.now = .str
-  }
 
-  if p.s[p.i] == `-` {
+  if s == "" && p.s[p.i] == `-` {
     s = "-"
     p.i++
   }
-  if p.s[p.i] in NUMBERS {
+  if (s == "" || s == "-") && p.s[p.i] in NUMBERS {
     for {
       before := p.s[start .. p.i]
       if before.len == 0 && p.s[p.i] == `0` {
@@ -189,7 +186,16 @@ fn (p mut Parser) next() ?Token {
         }
       }
       else {
-        return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
+        if s == "" && (p.prev == .comma || ((p.prev == .str || p.prev == .open) && p.options.ignore_commas)) && p.s[p.i] != `"` && !p.options.key_require_quotes {
+          for p.s[p.i] != `:` {
+            p.i++
+          }
+          p.i--
+          s = p.s[start .. p.i + 1]
+          p.now = .str
+        } else {
+          return error("Unexpected symbol: `${p.s[p.i].str()}` at position $p.i")
+        }
       }
     }
   }
@@ -213,7 +219,20 @@ pub fn (p mut Parser) parse(s string) map[string]string {
       .open {
         if p.prev == .colon && p.options.recursive {
           start := p.i
-          end := p.s.index_after("}", start)
+          mut end := 0
+          mut brackets := 1
+          for i := start; i < p.s.len; i++ {
+            if p.s[i] == `{` {
+              brackets++
+            }
+            if p.s[i] == `}` {
+              brackets--
+            }
+            if brackets == 0 {
+              end = i
+              break
+            }
+          }
           str := p.s[start - 1 .. end + 1]
           mut parser := new_parser(p.options)
           map2 := parser.parse(str)
@@ -238,7 +257,7 @@ pub fn (p mut Parser) parse(s string) map[string]string {
         }
       }
       .comma {
-        if p.prev != .str || p.current_key != "" {
+        if (p.prev != .str && (p.prev != .comma && p.options.ignore_commas)) || p.current_key != "" {
           m["__error__"] = "Unexpected comma at position $p.i"
           return m
         }
@@ -253,8 +272,7 @@ pub fn (p mut Parser) parse(s string) map[string]string {
         return m
       }
       .str {
-        println(p.prev.str())
-        if p.prev == .comma || p.prev == .open {
+        if p.prev == .comma || p.prev == .open || (p.prev == .str && p.options.ignore_commas) {
           p.current_key = token.str
           if m[p.current_key] != "" && !p.options.allow_duplicate_keys {
             m["__error__"] = "Duplicate key $p.current_key at $p.i"

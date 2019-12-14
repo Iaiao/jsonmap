@@ -2,19 +2,17 @@
     "key1": "value1",
     "key2": "value2",
     "key3": "value3",
+    "key4": "value4",
     "object": {
-        "recursive": "true by default",
-        "bool-support": true,
-        "int-support": 1.23E-14,
-        "object": {
+        "a": "b",
+        "c": "d",
+        "obj": {
             "a": "b",
             "c": "d",
-            "null": null,
-            "keys require quotes": "yes, but you can change this",
-            "more objects": {
-                "why": "unknown"
-            }
-        }
+            "e": "f"
+        },
+        "e": "f",
+        "g": "h"
     },
-    "key4": "value4"
+    "key": "value4"
 }
