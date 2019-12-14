@@ -93,7 +93,6 @@ fn (p mut Parser) next() ?Token {
           // do not allow multiple `E`s
           break
         }
-        e_start := p.i
         p.i++
         if p.s[p.i] == `+` || p.s[p.i] == `-` {
           // allow E+n, E-n, En ==
