@@ -16,6 +16,7 @@ const (
 )
 
 pub struct ParserOptions {
+pub:
   ignore_symbols []byte
   recursive bool
   recursion_symbol string
@@ -74,21 +75,21 @@ fn (p mut Parser) next() ?Token {
   mut s := ""
 
   // strings.Builder can build only once and byte array is private
-  mut builder := []byte
+  int_start := p.i
   if p.s[p.i] == `-` {
     s = "-"
     p.i++
   }
   if p.s[p.i] in NUMBERS {
     for {
-      if builder.len == 0 && p.s[p.i] == `0` {
+      before := p.s[int_start .. p.i]
+      if before.len == 0 && p.s[p.i] == `0` {
         // do not allow numbers with leading zeros
-        builder << `0`
         p.i++
         break
       }
-      if builder.len > 0 && (p.s[p.i] == `e` || p.s[p.i] == `E`) {
-        if builder.contains(`e`) || builder.contains(`E`) {
+      if before.len > 0 && (p.s[p.i] == `e` || p.s[p.i] == `E`) {
+        if before.contains("e") || before.contains("E") {
           // do not allow multiple `E`s
           break
         }
@@ -100,20 +101,18 @@ fn (p mut Parser) next() ?Token {
         }
         if p.s[p.i] in NUMBERS {
           p.i++
-          builder.push_many(p.s[e_start .. p.i].str, p.i - e_start)
           continue
         }
         return error("Unexpected `${p.s[p.i-1].str()}` at position ${p.i-1}")
       }
       if p.i > 0 && p.s[p.i] == `.` {
         // do not allow leading `.`
-        if builder.contains(`e`) || builder.contains(`E`) || builder.contains(`.`) {
+        if before.contains("e") || before.contains("E") || before.contains(".") {
           // do not allow `.` after `E` and multiple `.`s
           break
         }
         if p.s[p.i + 1] in NUMBERS {
           // do not allow trailing `.`
-          builder << `.`
           p.i++
           continue
         }
@@ -121,12 +120,11 @@ fn (p mut Parser) next() ?Token {
       if !(p.s[p.i] in NUMBERS) {
         break
       }
-      builder << p.s[p.i]
       p.i++
     }
     p.i--
     tk = .str
-    s += string(builder, builder.len)
+    s += p.s[int_start .. p.i]
   }
   if s == "-" {
     return error("Unexpected `-` at position $p.i")
